@@ -44,3 +44,11 @@ npm run build
 # 4. Run autonomous CloudOps audit
 npm start
 ```
+
+## 🖥️ Dashboard
+
+```bash
+npm run serve   # http://localhost:8081
+```
+
+> ⚠️ **Status:** Vultr inventory is currently mocked (src/vultr_tools.ts). Wire to the Vultr API with VULTR_API_KEY before submission.
