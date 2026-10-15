@@ -16,7 +16,10 @@ export interface SwarmAuditReport {
 }
 
 export class VultrSwarmOrchestrator {
-  constructor(public tools: VultrCloudTools) {}
+  constructor(
+    public tools: VultrCloudTools,
+    private applyRemediation = process.env.APPLY_REMEDIATION === "true"
+  ) {}
 
   async runCloudOpsAudit(): Promise<SwarmAuditReport> {
     const instances = await this.tools.listInstances();
@@ -24,23 +27,33 @@ export class VultrSwarmOrchestrator {
 
     for (const inst of instances) {
       if (inst.cpuUsagePct > 80) {
-        // High load detected -> autonomous scaling action
-        const scaled = await this.tools.scaleInstance(inst.id, "vc2-8c-16gb");
+        const targetPlan = "vc2-8c-16gb";
+        if (this.applyRemediation) {
+          await this.tools.scaleInstance(inst.id, targetPlan);
+        }
         findings.push({
           severity: "high",
           resourceId: inst.id,
           issue: `High CPU utilization detected: ${inst.cpuUsagePct}%`,
-          remediationAction: `Autonomously scaled ${inst.id} to vc2-8c-16gb`,
-          applied: true
+          remediationAction: this.applyRemediation
+            ? `Scaled ${inst.id} to ${targetPlan}`
+            : `Proposed scaling ${inst.id} to ${targetPlan}. Set APPLY_REMEDIATION=true to apply.`,
+          applied: this.applyRemediation
         });
       }
     }
+
+    const summary = findings.length === 0
+      ? "All Vultr instances healthy."
+      : this.applyRemediation
+        ? `Remediated ${findings.length} performance bottlenecks.`
+        : `Proposed ${findings.length} remediations. None applied.`;
 
     return {
       timestamp: new Date().toISOString(),
       nodesScanned: instances.length,
       findings,
-      remediationSummary: findings.length === 0 ? "All Vultr instances healthy." : `Remediated ${findings.length} performance bottlenecks.`
+      remediationSummary: summary
     };
   }
 }
